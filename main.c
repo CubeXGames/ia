@@ -23,7 +23,7 @@ const unsigned char palette1[] = {
 
 void updateRandom(void) {
 
-	/*xorshift rng with some added randomness from the controller 1 inputs*/
+	/*xorshift rng with some added randomness from the controller 1 inputs, don't bother with carry*/
 	__asm__ ("lda %v", controller1);
 	__asm__ ("clc");
 	__asm__ ("adc %v", rng);
@@ -47,20 +47,20 @@ void init(void) {
 	rng.seed = 0b111101011101000U + controller1; /*add a bit of randomness based on the inputs on controller 1*/
 	
 	/*initialize sprite zero*/
-	spriteIds[spriteZero] = SPRITE_ZERO;
-	spriteVelocitiesX[spriteZero] = 0;
-	spriteVelocitiesY[spriteZero] = 0;
-	spritePositionsX[spriteZero] = 0;
-	spritePositionsY[spriteZero] = 0;
-	spriteOamAttributes[spriteZero] = 0; /*don't ever initialize*/
+	spriteIds[SPRITE_ZERO_INDEX] = SPRITE_ZERO;
+	spriteVelocitiesX[SPRITE_ZERO_INDEX] = 0;
+	spriteVelocitiesY[SPRITE_ZERO_INDEX] = 0;
+	spritePositionsX[SPRITE_ZERO_INDEX] = 0;
+	spritePositionsY[SPRITE_ZERO_INDEX] = 0;
+	spriteOamAttributes[SPRITE_ZERO_INDEX] = 0; /*don't ever initialize*/
 
 	/*initialize player*/
-	spriteIds[player] = PLAYER;
-	spriteVelocitiesX[player] = 0;
-	spriteVelocitiesY[player] = 0;
-	spritePositionsX[player] = 0x40;
-	spritePositionsY[player] = 0x7F;
-	spriteOamAttributes[player] = SPRITE_INITIALIZING_BITMASK;
+	spriteIds[PLAYER_SPRITE_INDEX] = PLAYER;
+	spriteVelocitiesX[PLAYER_SPRITE_INDEX] = 0;
+	spriteVelocitiesY[PLAYER_SPRITE_INDEX] = 0;
+	spritePositionsX[PLAYER_SPRITE_INDEX] = 0x40;
+	spritePositionsY[PLAYER_SPRITE_INDEX] = 0x7F;
+	spriteOamAttributes[PLAYER_SPRITE_INDEX] = SPRITE_INITIALIZING_BITMASK;
 }
 
 void main(void) {

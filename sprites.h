@@ -2,6 +2,7 @@
 #define SPRITES_H
 
 #include "globalDefs.h"
+#include "debug.h"
 
 #define NO_SPRITE 0
 #define NUM_SPRITES 12
@@ -14,6 +15,9 @@
 /*sprite ids*/
 #define PLAYER 1
 #define SPRITE_ZERO 2
+
+#define SPRITE_ZERO_INDEX 0
+#define PLAYER_SPRITE_INDEX 1
 
 typedef void (*spriteHandler)(void); /*a handler for sprites, must not use global_i*/
 
@@ -59,15 +63,16 @@ void updatePlayer(void) {
 	
 	spriteVelocitiesX[currentSprite] = (controller1 & PAD_RIGHT) << 4;
 	spriteVelocitiesX[currentSprite] -= (controller1 & PAD_LEFT) << 3;
+	
+	printNumber(spriteVelocitiesX[currentSprite], 10, 14);
 
 	spriteVelocitiesY[currentSprite] = (controller1 & PAD_DOWN) << 2;
 	spriteVelocitiesY[currentSprite] -= (controller1 & PAD_UP) << 1;
+	
+	printNumber(spriteVelocitiesY[currentSprite], 10, 15);
 }
 
 #pragma endregion
-
-const unsigned char spriteZero = 0;
-const unsigned char player = 1;
 
 const unsigned char playerMetasprite[] = {
 
@@ -75,6 +80,12 @@ const unsigned char playerMetasprite[] = {
 	-8, -8,  0x10, 1,
 	 0, -8,  0x10, 1 | OAM_FLIP_H,
 	 0, -16, 0x00, 1 | OAM_FLIP_H,
+	128
+};
+
+const unsigned char spriteZeroMetasprite[] = {
+
+	0, 0, 0x01, 0,
 	128
 };
 
@@ -88,25 +99,74 @@ const spriteHandler spriteHandlerJumpTable[] = {
 const unsigned char* metaspriteDataPointers[] = {
 	
 	NULL, /*index 0*/
-	playerMetasprite /*index 1*/
+	playerMetasprite, /*index 1*/
+	spriteZeroMetasprite /*index 2*/
 };
 
 /*uses global_i and global_j*/
 void updateSprites(void) {
-
+	
+	static unsigned char temp1, temp2; /*temp variables for assembly stuff*/
 	for(global_i = 0; global_i < NUM_SPRITES; ++global_i) {
 		
 		currentSprite = spriteShuffler[global_i];
 		if(spriteIds[currentSprite] == NO_SPRITE) continue; /*ignore if an empty sprite slot*/
 		
 		/*update the position and subpixels for each sprite*/
-		spriteSubPixelsX[currentSprite] += spriteVelocitiesX[currentSprite];
-		spritePositionsX[currentSprite] += spriteSubPixelsX[currentSprite] >> 4;
-		spriteSubPixelsX[currentSprite] &= SUBPIXEL_BITMASK;
+		__asm__ ("ldx %v", currentSprite); /*load the x register with the current sprite id*/
 		
-		spriteSubPixelsY[currentSprite] += spriteVelocitiesY[currentSprite];
-		spritePositionsY[currentSprite] += spriteSubPixelsY[currentSprite] >> 4;
-		spriteSubPixelsY[currentSprite] &= SUBPIXEL_BITMASK;
+		/*spriteSubPixelsX[currentSprite] += spriteVelocitiesX[currentSprite];*/
+		__asm__ ("lda %v,x", spriteVelocitiesX);
+		__asm__ ("sta %v", temp1);
+		__asm__ ("lda %v,x", spriteSubPixelsX);
+		__asm__ ("clc");
+		__asm__ ("adc %v", temp1);
+		__asm__ ("sta %v,x", spriteSubPixelsX);
+		
+		/*spritePositionsX[currentSprite] += spriteSubPixelsX[currentSprite] >> 4;*/
+		/*don't need to get spriteSubPixelsX[currentSprite] again, because it's already in the accumulator*/
+		//__asm__ ("lsr a");
+		//__asm__ ("lsr a");
+		//__asm__ ("lsr a");
+		//__asm__ ("lsr a");
+		__asm__ ("stx %v", temp2);
+		__asm__ ("jsr asrax4");
+		__asm__ ("sta %v", temp1);
+		__asm__ ("ldx %v", temp2);
+		__asm__ ("lda %v,x", spritePositionsX);
+		__asm__ ("clc");
+		__asm__ ("adc %v", temp1);
+		__asm__ ("sta %v,x", spritePositionsX);
+		
+		/*spriteSubPixelsX[currentSprite] &= SUBPIXEL_BITMASK;*/
+		__asm__ ("lda %v,x", spriteSubPixelsX);
+		__asm__ ("and #%b", SUBPIXEL_BITMASK);
+		__asm__ ("sta %v,x", spriteSubPixelsX);
+		
+		/*spriteSubPixelsY[currentSprite] += spriteVelocitiesY[currentSprite];*/
+		__asm__ ("lda %v,x", spriteVelocitiesY);
+		__asm__ ("sta %v", temp1);
+		__asm__ ("lda %v,x", spriteSubPixelsY);
+		__asm__ ("clc");
+		__asm__ ("adc %v", temp1);
+		__asm__ ("sta %v,x", spriteSubPixelsY);
+		
+		/*spritePositionsY[currentSprite] += spriteSubPixelsY[currentSprite] >> 4;*/
+		__asm__ ("clc");
+		__asm__ ("lsr a");
+		__asm__ ("lsr a");
+		__asm__ ("lsr a");
+		__asm__ ("lsr a");
+		__asm__ ("sta %v", temp1);
+		__asm__ ("lda %v,x", spritePositionsY);
+		__asm__ ("clc");
+		__asm__ ("adc %v", temp1);
+		__asm__ ("sta %v,x", spritePositionsY);
+		
+		/*spriteSubPixelsY[currentSprite] &= SUBPIXEL_BITMASK;*/
+		__asm__ ("lda %v,x", spriteSubPixelsY);
+		__asm__ ("and #%b", SUBPIXEL_BITMASK);
+		__asm__ ("sta %v,x", spriteSubPixelsY);
 		
 		spriteHandlerJumpTable[spriteIds[currentSprite]](); /*run the sprite id-specific code for the sprite*/
 		oam_meta_spr(spritePositionsX[currentSprite], spritePositionsY[currentSprite], metaspriteDataPointers[spriteIds[currentSprite]]); /*draw the sprite*/
