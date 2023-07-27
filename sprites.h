@@ -1,3 +1,8 @@
+#ifndef SPRITES_H
+#define SPRITES_H
+
+#include "globalDefs.h"
+
 #define NO_SPRITE 0
 #define NUM_SPRITES 12
 #define SUBPIXEL_BITMASK 0b00001111
@@ -12,37 +17,17 @@
 
 typedef void (*spriteHandler)(void); /*a handler for sprites, must not use global_i*/
 
-const unsigned char spriteZero = 0;
-const unsigned char player = 1;
-
-const unsigned char playerMetasprite[] = {
-
-	-8, -16, 0x00, 1,
-	-8, -8,  0x10, 1,
-	 0, -8,  0x10, 1 | OAM_FLIP_H,
-	 0, -16, 0x00, 1 | OAM_FLIP_H,
-	128
-};
-
-#pragma bss-name(push, "ZEROPAGE")
-
-unsigned char global_i, global_j; /*for use by loops, in the zeropage, make sure not to have conflicts!*/
-unsigned char currentSprite;
-unsigned char spriteShuffler[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
-
-#pragma bss-name(pop)
+typedef union {
+	
+	struct { unsigned char attrib1, attrib2; };
+	unsigned short longAttrib;
+} spriteAttribute;
 
 typedef struct {
 
 	signed char offsetX, offsetY;
 	unsigned char sizeX, sizeY;
 } boundingBox;
-
-typedef union {
-	
-	struct { unsigned char attrib1, attrib2; }
-	unsigned short longAttrib;
-} spriteAttribute;
 
 unsigned char spritePositionsX[NUM_SPRITES];
 unsigned char spritePositionsY[NUM_SPRITES];
@@ -53,6 +38,15 @@ signed char spriteVelocitiesY[NUM_SPRITES];
 unsigned char spriteIds[NUM_SPRITES];
 unsigned char spriteOamAttributes[NUM_SPRITES];
 spriteAttribute spriteAttributes[NUM_SPRITES];
+
+#pragma bss-name(push, "ZEROPAGE")
+
+unsigned char currentSprite;
+unsigned char spriteShuffler[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+
+#pragma bss-name(pop)
+
+#pragma region Sprite Handlers
 
 void noSpriteUpdate(void) {}
 
@@ -70,6 +64,33 @@ void updatePlayer(void) {
 	spriteVelocitiesY[currentSprite] -= (controller1 & PAD_UP) << 1;
 }
 
+#pragma endregion
+
+const unsigned char spriteZero = 0;
+const unsigned char player = 1;
+
+const unsigned char playerMetasprite[] = {
+
+	-8, -16, 0x00, 1,
+	-8, -8,  0x10, 1,
+	 0, -8,  0x10, 1 | OAM_FLIP_H,
+	 0, -16, 0x00, 1 | OAM_FLIP_H,
+	128
+};
+
+const spriteHandler spriteHandlerJumpTable[] = {
+	
+	noSpriteUpdate, /*index 0*/
+	updatePlayer, /*index 1*/
+	noSpriteUpdate /*index 2*/
+};
+
+const unsigned char* metaspriteDataPointers[] = {
+	
+	NULL, /*index 0*/
+	playerMetasprite /*index 1*/
+};
+
 /*uses global_i and global_j*/
 void updateSprites(void) {
 
@@ -79,7 +100,6 @@ void updateSprites(void) {
 		if(spriteIds[currentSprite] == NO_SPRITE) continue; /*ignore if an empty sprite slot*/
 		
 		/*update the position and subpixels for each sprite*/
-		/*you might think that moving in a negative direction would require extra code when updating the sprite position, but it surprisingly doesn't!*/
 		spriteSubPixelsX[currentSprite] += spriteVelocitiesX[currentSprite];
 		spritePositionsX[currentSprite] += spriteSubPixelsX[currentSprite] >> 4;
 		spriteSubPixelsX[currentSprite] &= SUBPIXEL_BITMASK;
@@ -105,10 +125,9 @@ void updateSprites(void) {
 /*uses global_j, attributes must include SPRITE_INITIALIZING, puts return value in currentSprite*/
 void initializeSprite(unsigned char id, unsigned char positionX, unsigned char positionY, unsigned char oamAttributes) {
 	
-    currentSprite = sprites;
-	for(global_j = 0; global_j < sizeof(sprites) / sizeof(sprite); ++global_j) {
+	for(currentSprite = 2; currentSprite < NUM_SPRITES; ++currentSprite) { /*sprites 0 and 1 are sprite zero and the player so they won't ever be reinitialized*/
 		
-		if(currentSprite->id == NO_SPRITE) {
+		if(spriteIds[currentSprite] == NO_SPRITE) {
 			
 			spritePositionsX[currentSprite] = positionX;
 			spritePositionsY[currentSprite] = positionY;
@@ -125,15 +144,4 @@ void initializeSprite(unsigned char id, unsigned char positionX, unsigned char p
 	currentSprite = -1;
 }
 
-const spriteHandler spriteHandlerJumpTable[] = {
-	
-	noSpriteUpdate, /*index 0*/
-	updatePlayer, /*index 1*/
-	noSpriteUpdate /*index 2*/
-};
-
-const unsigned char* metaspriteDataPointers[] = {
-	
-	NULL, /*index 0*/
-	playerMetasprite /*index 1*/
-};
+#endif

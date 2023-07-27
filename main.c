@@ -1,22 +1,8 @@
 #include "lib/neslib.h"
 #include "lib/nesdoug.h"
 #include "sprites.h"
+#include "debug.h"
 #include "asm.h"
-
-#define TRUE 1
-#define FALSE 0
-
-#define BLACK 0x0f
-#define DARK_GREY 0x00
-#define LIGHT_GREY 0x10
-#define WHITE 0x30
-
-#define SCREEN_SIZE_X 32
-#define SCREEN_SIZE_Y 30
-#define NUMBER_TO_TILE 48
-
-/*remove before release*/
-#define DEBUG
 
 #define freeSprite(index) spriteIds[index] = NO_SPRITE
 #define getKey(bitmask) (controller1 & bitmask)
@@ -26,59 +12,6 @@
 #ifndef __CC65__ /*to avoid annoying vs code errors*/
 	#define frameCountNoOverflow updateSprites
 #endif
-
-typedef union {
-
-	unsigned short seed;
-	struct {
-
-		unsigned char randByte1;
-		unsigned char randByte2;
-	};
-} rngSeed; /*allows setting the seed and accessing both bytes easily*/
-
-#pragma bss-name(push, "ZEROPAGE")
-
-unsigned char controller1, controller1Prev;
-unsigned char frameCount;
-unsigned char frameCountOverflow;
-
-rngSeed rng;
-
-#pragma region Debug Functions
-#ifdef DEBUG
-
-void printNumber(unsigned char number, unsigned char x, unsigned char y) {
-
-	unsigned char output = 0;
-	unsigned char i_temp; //debug functions don't need to worry about memory usage
-	for(i_temp = 0; i_temp < 2; ++i_temp) {
-		
-		if(number >= 100) {
-
-			++output;
-			number -= 100;
-		}
-	}
-
-	one_vram_buffer(output + NUMBER_TO_TILE, NTADR_A(x, y));
-
-	output = 0;
-	for(i_temp = 0; i_temp < 10; ++i_temp) {
-
-		if(number >= 10) {
-
-			++output;
-			number -= 10;
-		}
-	}
-
-	one_vram_buffer(output + NUMBER_TO_TILE, NTADR_A(x + 1, y));
-	one_vram_buffer(number + NUMBER_TO_TILE, NTADR_A(x + 2, y));
-}
-
-#endif
-#pragma endregion
 
 const unsigned char palette1[] = {
 	
@@ -90,7 +23,7 @@ const unsigned char palette1[] = {
 
 void updateRandom(void) {
 
-	/*xorshift rng with some added randomness of the controller 1 inputs*/
+	/*xorshift rng with some added randomness from the controller 1 inputs*/
 	__asm__ ("lda %v", controller1);
 	__asm__ ("clc");
 	__asm__ ("adc %v", rng);
@@ -111,8 +44,16 @@ void init(void) {
 
 	frameCount = 0;
 	frameCountOverflow = FALSE;
-	rng.seed = 0b111101011101000U + controller1; /*add a bit of randomness based on the inputs on the controller*/
+	rng.seed = 0b111101011101000U + controller1; /*add a bit of randomness based on the inputs on controller 1*/
 	
+	/*initialize sprite zero*/
+	spriteIds[spriteZero] = SPRITE_ZERO;
+	spriteVelocitiesX[spriteZero] = 0;
+	spriteVelocitiesY[spriteZero] = 0;
+	spritePositionsX[spriteZero] = 0;
+	spritePositionsY[spriteZero] = 0;
+	spriteOamAttributes[spriteZero] = 0; /*don't ever initialize*/
+
 	/*initialize player*/
 	spriteIds[player] = PLAYER;
 	spriteVelocitiesX[player] = 0;
